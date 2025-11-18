@@ -34,7 +34,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     ];
 
     return (
-        <div className="bg-white shadow-sm p-4 flex items-center gap-2 border-b">
+        <div className="bg-white shadow-sm p-4 flex items-center gap-2">
             {tools.map((tool) => (
                 <button
                     key={tool.id}
