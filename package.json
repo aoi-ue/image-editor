@@ -10,13 +10,13 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "fabric": "6.7.1",
-        "konva": "^9.3.22",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
         "lucide-react": "^0.552.0",
         "mobx": "^6.15.0",
         "mobx-react-lite": "^4.1.1",
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0",
+        "fabric": "6.7.1",
+        "konva": "^9.3.22",
         "react-konva": "^19.2.0"
     },
     "devDependencies": {
