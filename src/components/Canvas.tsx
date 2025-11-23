@@ -1,21 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import { useDrawing } from '../store/DrawingStore';
 import * as fabric from 'fabric';
-
 interface CanvasProps {
     fabricCanvasRef: React.RefObject<fabric.Canvas | null>;
 }
-
 const Canvas: React.FC<CanvasProps> = ({ fabricCanvasRef }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const brushPathRef = useRef<fabric.Path | null>(null);
 
     const {
         selectedTool,
         selectedShape,
         selectedColor,
-        isDrawing,
-        setIsDrawing,
         saveToHistory,
     } = useDrawing();
 
@@ -39,39 +34,30 @@ const Canvas: React.FC<CanvasProps> = ({ fabricCanvasRef }) => {
         };
     }, [fabricCanvasRef]);
 
-    // TODO: v5 mouse events to v6
-    useEffect(() => {
-        const canvas = fabricCanvasRef.current;
-        if (!canvas) return;
+    // Handler for saving the brush stroke after it's drawn
+    const handlePathCreated = (e: fabric.IEvent): void => {
+        const path = e.path;
+        if (path) {
+            (path as any)._layerId = Date.now();
+            saveToHistory('brush', {
+                color: path.stroke,
+                objectId: (path as any)._layerId,
+            });
+        }
+    };
 
-        canvas.off('mouse:down');
-        canvas.off('mouse:move');
-        canvas.off('mouse:up');
-
-        canvas.on('mouse:down', handleMouseDown);
-        canvas.on('mouse:move', handleMouseMove);
-        canvas.on('mouse:up', handleMouseUp);
-    }, [
-        selectedTool,
-        selectedColor,
-        selectedShape,
-        isDrawing,
-        fabricCanvasRef,
-    ]);
-
+    // Handle shape creation on mouse move
     const handleMouseDown = (e: fabric.TEvent): void => {
         const canvas = fabricCanvasRef.current;
         if (!selectedTool || !canvas || !e.e) return;
 
-        if (selectedTool === 'shape' || selectedTool === 'brush') {
+        if (selectedTool === 'shape') {
             canvas.selection = false;
             canvas.discardActiveObject();
-        }
 
-        const pointer = canvas.getViewportPoint(e.e);
-
-        if (selectedTool === 'shape') {
+            const pointer = canvas.getViewportPoint(e.e);
             let shape: fabric.Object | null = null;
+
             const options = {
                 left: pointer.x - 50,
                 top: pointer.y - 50,
@@ -81,22 +67,31 @@ const Canvas: React.FC<CanvasProps> = ({ fabricCanvasRef }) => {
                 hasBorders: true,
             };
 
-            if (selectedShape === 'rectangle') {
-                shape = new fabric.Rect({
-                    ...options,
-                    width: 100,
-                    height: 100,
-                });
-            } else if (selectedShape === 'circle') {
-                shape = new fabric.Circle({ ...options, radius: 50 });
-            } else if (selectedShape === 'triangle') {
-                shape = new fabric.Triangle({
-                    ...options,
-                    width: 100,
-                    height: 100,
-                });
+            switch (selectedShape) {
+                case 'rectangle':
+                    shape = new fabric.Rect({
+                        ...options,
+                        width: 100,
+                        height: 100,
+                    });
+                    break;
+                case 'circle':
+                    shape = new fabric.Circle({
+                        ...options,
+                        radius: 50,
+                    });
+                    break;
+                case 'triangle':
+                    shape = new fabric.Triangle({
+                        ...options,
+                        width: 100,
+                        height: 100,
+                    });
+                    break;
+                default:
+                    return;
             }
-            // TODO: hahahhaha no 'any' pls :)
+
             if (shape) {
                 (shape as any)._layerId = Date.now();
                 canvas.add(shape);
@@ -107,60 +102,59 @@ const Canvas: React.FC<CanvasProps> = ({ fabricCanvasRef }) => {
                     objectId: (shape as any)._layerId,
                 });
             }
-        } else if (selectedTool === 'brush') {
-            setIsDrawing(true);
-            const path = new fabric.Path(
-                `M ${pointer.x} ${pointer.y}`,
-                {
-                    stroke: selectedColor,
-                    strokeWidth: 3,
-                    fill: '',
-                    selectable: false,
-                }
-            );
-            brushPathRef.current = path;
-            canvas.add(path);
         }
     };
 
-    const handleMouseMove = (e: fabric.TEvent): void => {
-        if (
-            !isDrawing ||
-            selectedTool !== 'brush' ||
-            !brushPathRef.current ||
-            !fabricCanvasRef.current ||
-            !e.e
-        )
-            return;
+    // Event handling: brush uses native drawing mode, shapes use custom mouse handler
+    useEffect(() => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
 
-        const pointer = fabricCanvasRef.current.getPointer(e.e);
-        const path = brushPathRef.current;
-        (path.path as any).push(['L', pointer.x, pointer.y]);
-        fabricCanvasRef.current.renderAll();
-    };
+        // Clean up previous listeners
+        canvas.off('mouse:down', handleMouseDown);
+        canvas.off('path:created', handlePathCreated);
 
-    // TO FIX: use freehand brush, see: https://fabricjs.com/api/classes/canvas/#freedrawingbrush
-    const handleMouseUp = (): void => {
-        if (selectedTool === 'brush' && isDrawing) {
-            setIsDrawing(false);
-            if (brushPathRef.current) {
-                (brushPathRef.current as any)._layerId = Date.now();
-                saveToHistory('brush', {
-                    color: selectedColor,
-                    objectId: (brushPathRef.current as any)._layerId,
-                });
+        if (selectedTool === 'brush') {
+            // Initialize PencilBrush if needed
+            if (!canvas.freeDrawingBrush) {
+                canvas.freeDrawingBrush = new fabric.PencilBrush(
+                    canvas
+                );
             }
-            brushPathRef.current = null;
+
+            // Enable native free drawing mode
+            canvas.isDrawingMode = true;
+            canvas.freeDrawingBrush.width = 3;
+            canvas.freeDrawingBrush.color = selectedColor;
+            canvas.selection = false;
+
+            // Listen for finished brush strokes
+            canvas.on('path:created', handlePathCreated);
+        } else if (selectedTool === 'shape') {
+            // Disable free drawing mode for shape tool
+            canvas.isDrawingMode = false;
+            canvas.selection = false;
+
+            // Enable shape creation handler
+            canvas.on('mouse:down', handleMouseDown);
+        } else {
+            // For other tools (select, fill), allow normal selection
+            canvas.isDrawingMode = false;
+            canvas.selection = true;
         }
-    };
+
+        return () => {
+            canvas.off('mouse:down', handleMouseDown);
+            canvas.off('path:created', handlePathCreated);
+        };
+    }, [selectedTool, selectedColor, selectedShape, fabricCanvasRef]);
 
     return (
         <div className="flex-1 flex items-center justify-center p-8">
-            <div className="bg-white shadow-lg">
+            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                 <canvas ref={canvasRef} />
             </div>
         </div>
     );
 };
-
 export default Canvas;
