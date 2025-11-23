@@ -11,23 +11,22 @@ const DrawingApp: React.FC = () => {
         (layerId: number): void => {
             const canvas = fabricCanvasRef.current;
             if (!canvas) {
-                console.warn(
-                    'Canvas not initialized for removeObjectByLayerId'
-                );
                 return;
             }
 
-            const objects = canvas.getObjects();
+            // Explicitly define the objects array as an array of fabric.Object
+            const objects: fabric.Object[] = canvas.getObjects();
+
+            // Find the object. We need to tell TypeScript that obj *might* have _layerId
             const objToRemove = objects.find(
-                (obj: any) => obj._layerId === layerId
+                // We extend the fabric.Object type inline to include the custom property
+                (obj: fabric.Object & { _layerId?: number }) =>
+                    obj._layerId === layerId
             );
 
             if (objToRemove) {
                 canvas.remove(objToRemove);
                 canvas.renderAll();
-                console.log('Removed object from canvas:', layerId);
-            } else {
-                console.warn('Object not found on canvas:', layerId);
             }
         },
         []
