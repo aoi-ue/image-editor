@@ -1,20 +1,39 @@
 import React from 'react';
 import { Square, Circle, Triangle } from 'lucide-react';
+import * as fabric from 'fabric';
 import { useDrawing } from '../store/DrawingStore';
-//todo: implement clickOutside hook to close panel when clicking... outside
 
 interface PanelProps {
-    onColorFill: () => void;
+    fabricCanvasRef: React.RefObject<fabric.Canvas | null>;
 }
 
-const Panel: React.FC<PanelProps> = ({ onColorFill }) => {
+const Panel: React.FC<PanelProps> = ({ fabricCanvasRef }) => {
     const {
         selectedTool,
         selectedShape,
         setSelectedShape,
         selectedColor,
         setSelectedColor,
+        saveToHistory,
     } = useDrawing();
+
+    // --- HANDLER FUNCTION ---
+    const handleColorFill = (): void => {
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) {
+            return;
+        }
+
+        canvas.backgroundColor = selectedColor;
+        canvas.renderAll();
+
+        saveToHistory('fill', {
+            color: selectedColor,
+            objectId: null,
+        });
+    };
+
+    // --- RENDER LOGIC ---
 
     if (
         !selectedTool ||
@@ -43,11 +62,12 @@ const Panel: React.FC<PanelProps> = ({ onColorFill }) => {
                                         onClick={() =>
                                             setSelectedShape(shape)
                                         }
-                                        className={`p-2 rounded border ${
+                                        className={`p-2 rounded border transition-colors ${
                                             selectedShape === shape
                                                 ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-300'
+                                                : 'border-gray-300 hover:border-gray-400'
                                         }`}
+                                        type="button"
                                     >
                                         {shape === 'rectangle' && (
                                             <Square size={16} />
@@ -105,8 +125,9 @@ const Panel: React.FC<PanelProps> = ({ onColorFill }) => {
                         </div>
                     </div>
                     <button
-                        onClick={onColorFill}
-                        className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        onClick={handleColorFill}
+                        className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-medium"
+                        type="button"
                     >
                         Apply Fill
                     </button>
