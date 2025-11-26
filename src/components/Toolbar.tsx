@@ -13,11 +13,13 @@ import { useDrawing } from '../store/DrawingStore';
 interface ToolbarProps {
     fabricCanvasRef: React.RefObject<fabric.Canvas | null>;
     removeObjectByLayerId: (layerId: number) => void;
+    onToolbarClick: () => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
     fabricCanvasRef,
     removeObjectByLayerId,
+    onToolbarClick,
 }) => {
     const {
         selectedTool,
@@ -32,8 +34,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
     } = useDrawing();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // --- HANDLER FUNCTIONS ---
 
     const handleImageUpload = (
         e: React.ChangeEvent<HTMLInputElement>
@@ -73,7 +73,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         if (historyIndex >= 0 && canvas) {
             const historyItem = history[historyIndex];
 
-            // Remove the object or revert the background
             if (historyItem.layer.objectId) {
                 removeObjectByLayerId(historyItem.layer.objectId);
             } else if (historyItem.actionType === 'fill') {
@@ -81,7 +80,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 canvas.renderAll();
             }
 
-            // Remove the last layer entry
             setLayers((prev) => prev.slice(0, -1));
             setHistoryIndex((prev) => prev - 1);
         }
@@ -167,8 +165,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         }
     };
 
-    // --- RENDER LOGIC ---
-
     const tools = [
         { id: 'shape', icon: Square, label: 'Shape' },
         { id: 'fill', icon: Droplet, label: 'Fill' },
@@ -176,18 +172,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
         { id: 'upload', icon: Upload, label: 'Upload Image' },
     ];
 
+    const handleToolClick = (toolId: string) => {
+        if (toolId === 'upload') {
+            fileInputRef.current?.click();
+        } else {
+            setSelectedTool(toolId);
+            onToolbarClick();
+        }
+    };
+
     return (
         <div className="bg-white shadow-sm p-4 flex items-center gap-2">
             {tools.map((tool) => (
                 <button
                     key={tool.id}
-                    onClick={() => {
-                        if (tool.id === 'upload') {
-                            fileInputRef.current?.click();
-                        } else {
-                            setSelectedTool(tool.id);
-                        }
-                    }}
+                    onClick={() => handleToolClick(tool.id)}
                     className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                         selectedTool === tool.id ? 'bg-blue-100' : ''
                     }`}
